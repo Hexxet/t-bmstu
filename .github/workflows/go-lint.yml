@@ -1,0 +1,25 @@
+---
+name: Go linting
+
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go 1.23
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23
+
+      - name: Lint with golangci-linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64

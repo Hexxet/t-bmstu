@@ -1,0 +1,64 @@
+---
+name: Deployment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      - name: Capture Terraform Outputs
+        run: terraform output -json > tf_output.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.3'
+
+      - name: Make get_hosts.py executable
+        run: chmod +x ./get_hosts.py
+
+      - name: Generate hosts.ini
+        run: ./get_hosts.py -o tf_output.json hosts.ini
+
+      - name: Upload Hosts Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosts
+          path: hosts.ini
+
+  ansible:
+    runs-on: self-hosted
+    needs: terraform
+    defaults:
+      run:
+        working-directory: ansible
+
+    steps:
+      - name: Checkout Ansible Code
+        uses: actions/checkout@v4
+
+      - name: Download Hosts Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hosts
+
+      - name: Create Vault Password File
+        run: echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > password
+
+      - name: Run Ansible Playbook
+        run: ansible-playbook playbook.yml --vault-password-file password

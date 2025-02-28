@@ -1,0 +1,30 @@
+---
+- name: Create destination directory for manifests
+  ansible.builtin.file:
+    path: "/opt/{{ app_name }}"
+    state: directory
+    mode: '0744'
+
+- name: Copy manifest files
+  ansible.builtin.template:
+    src: "{{ item }}.yml.j2"
+    dest: "/opt/{{ app_name }}/{{ item }}.yml"
+    mode: 0644
+  loop:
+    - deployment
+    - service
+    - ingress
+    - pvc
+  no_log: true
+
+- name: Apply manifest files
+  kubernetes.core.k8s:
+    state: present
+    namespace: default
+    src: "/opt/{{ app_name }}/{{ item }}.yml"
+  loop:
+    - deployment
+    - service
+    - ingress
+    - pvc
+  no_log: true
