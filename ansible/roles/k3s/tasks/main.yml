@@ -1,0 +1,73 @@
+---
+- name: Check if k3s is installed
+  ansible.builtin.command: |
+    k3s --version
+  register: k3s_check
+  ignore_errors: true
+
+- name: Set flag for k3s installation
+  ansible.builtin.set_fact:
+    k3s_not_installed: "{{ k3s_check.rc != 0 }}"
+
+- name: Download K3s install script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io/
+    timeout: 60
+    dest: /usr/local/bin/k3s-install.sh
+    owner: root
+    group: root
+    mode: "0755"
+  when: k3s_not_installed
+
+- name: Install server k3s and get master token
+  when: inventory_hostname in groups['master']
+  block:
+    - name: Run K3s server install script
+      ansible.builtin.command: |
+        /usr/local/bin/k3s-install.sh
+      environment:
+        INSTALL_K3S_EXEC: --disable=traefik
+      when: k3s_not_installed
+
+    - name: Get master token
+      ansible.builtin.command: |
+        cat /var/lib/rancher/k3s/server/node-token
+      register: k3s_token
+      no_log: true
+
+    - name: Set master token fact
+      ansible.builtin.set_fact:
+        k3s_token: "{{ k3s_token.stdout }}"
+      no_log: true
+
+- name: Install agent k3s
+  when: inventory_hostname in groups['worker']
+  block:
+    - name: Run K3s agent install script
+      ansible.builtin.command: |
+        /usr/local/bin/k3s-install.sh
+      environment:
+        INSTALL_K3S_EXEC: --with-node-id
+        K3S_URL: "https://{{ hostvars[groups['master'][0]].ansible_default_ipv4.address }}:6443"
+        K3S_TOKEN: "{{ hostvars[groups['master'][0]].k3s_token }}"
+      when: k3s_not_installed
+
+- name: Ensure that /etc/rancher/k3s folder exitsts
+  ansible.builtin.file:
+    path: /etc/rancher/k3s/
+    state: directory
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Add config file for custom registries
+  ansible.builtin.template:
+    src: registries.yaml.j2
+    dest: /etc/rancher/k3s/registries.yaml
+    owner: root
+    group: root
+    mode: 0600
+  notify:
+    - Restart k3s
+    - Restart k3s-agent
+  no_log: true

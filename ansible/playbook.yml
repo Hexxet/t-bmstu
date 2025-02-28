@@ -1,0 +1,15 @@
+---
+- name: Insttall k3s
+  hosts: master:worker
+  become: true
+  roles:
+    - k3s
+
+- name: Setup k3s and launch app
+  hosts: master
+  become: true
+  environment:
+    K8S_AUTH_KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  roles:
+    - k3s_setup
+    - app

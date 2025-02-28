@@ -1,0 +1,32 @@
+---
+- name: Install pip3
+  ansible.builtin.apt:
+    name: python3-pip
+    state: present
+    update_cache: true
+
+- name: Install kubernetes via pip3
+  ansible.builtin.pip:
+    name: kubernetes
+    executable: pip3
+
+- name: Install dependencies
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ item }}"
+  loop:
+    - https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/cloud/deploy.yaml
+    - https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.31/deploy/local-path-storage.yaml
+
+- name: Wait for deployments to be ready
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  register: deployment_status
+  until: deployment_status.resources[0].status.availableReplicas | default(0) > 0
+  retries: 10
+  delay: 15
+  loop:
+    - {name: "ingress-nginx-controller", namespace: "ingress-nginx"}
+    - {name: "local-path-provisioner", namespace: "local-path-storage"}

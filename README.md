@@ -1,5 +1,7 @@
 # t-bmstu
 
+Code by [@BaldiSlayer](https://github.com/BaldiSlayer) / DevOps by [@Hexxet](https://github.com/Hexxet)
+
 Это агрегатор тестирующих систем.
 Пока что планируется добавить следующие тестирующие системы:
 * [codeforces](https://codeforces.com/)

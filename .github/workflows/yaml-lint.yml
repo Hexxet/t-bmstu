@@ -1,0 +1,28 @@
+---
+name: YAML linting
+
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create yamllint config
+        run: |
+          cat > .yamllint <<'EOF'
+          extends: default
+          rules:
+            line-length:
+              max: 120
+              level: warning
+          EOF
+
+      - name: Lint with yamllint
+        uses: ibiqlik/action-yamllint@v3

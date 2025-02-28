@@ -1,0 +1,130 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ app_name }}-web-deployment
+  labels:
+    app: {{ app_name }}
+spec:
+  replicas: {{ web_replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app: {{ app_name }}-web
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}-web
+    spec:
+      containers:
+      - name: web
+        image: {{ image_web_repository }}:{{ image_web_tag }}
+        ports:
+        - containerPort: {{ app_port}}
+        env:
+        - name: APP_PORT
+          value: "{{ app_port }}"
+        - name: DB_USER
+          value: "{{ postgres_user }}"
+        - name: DB_PASSWORD
+          value: "{{ postgres_password }}"
+        - name: DB_NAME
+          value: "{{ postgres_db }}"
+        - name: DB_HOST
+          value: "{{ app_name }}-db-service"
+        livenessProbe:
+          httpGet:
+            path: /auth/login
+            port: {{ app_port }}
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          timeoutSeconds: 3
+          initialDelaySeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /auth/login
+            port: {{ app_port }}
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          timeoutSeconds: 3
+          initialDelaySeconds: 15
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ app_name }}-db-deployment
+  labels:
+    app: {{ app_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app_name }}-db
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}-db
+    spec:
+      containers:
+      - name: db
+        image: postgres:{{ image_db_tag }}
+        env:
+        - name: POSTGRES_USER
+          value: "{{ postgres_user }}"
+        - name: POSTGRES_PASSWORD
+          value: "{{ postgres_password}}"
+        - name: POSTGRES_DB
+          value: "{{ postgres_db }}"
+        - name: PGDATA
+          value: "{{ pgdata }}"
+        volumeMounts:
+        - name: db-pvc
+          mountPath: {{ pgdata }}
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "{{ postgres_user }}", "-d", "{{ postgres_db }}"]
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "{{ postgres_user }}", "-d", "{{ postgres_db }}"]
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+          requests:
+            memory: "512Mi"
+            cpu: "1000m"
+      volumes:
+        - name: db-pvc
+          persistentVolumeClaim:
+            claimName: {{ app_name }}-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: db-pvc
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: {{ storage_amount }}Mi

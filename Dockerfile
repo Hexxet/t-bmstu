@@ -1,16 +1,17 @@
-FROM golang:latest
+FROM golang:1.23.6-alpine3.21 AS builder
 
 WORKDIR /app
-
-# Копируем все файлы из текущего каталога (где находится Dockerfile) внутрь контейнера
 COPY . .
 
 RUN go mod tidy
-
-# Сборка приложения
 RUN go build -o main ./cmd/
+
+
+FROM alpine:3.21
+
+WORKDIR /app
+COPY --from=builder /app/main .
 
 EXPOSE 8080
 
-# Запуск приложения
 CMD ["./main"]
